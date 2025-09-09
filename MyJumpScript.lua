@@ -1,24 +1,22 @@
 -- This is a client-side script for use in an executor.
--- It creates a GUI slider to control your own jump power.
+-- It creates a GUI slider to control your character's levitation force.
 
 -- Make sure the script doesn't error if it's run more than once
-if game.Players.LocalPlayer.PlayerGui:FindFirstChild("ExecutorJumpSliderGui") then
-    game.Players.LocalPlayer.PlayerGui.ExecutorJumpSliderGui:Destroy()
+if game.Players.LocalPlayer.PlayerGui:FindFirstChild("ExecutorLevitationSliderGui") then
+    game.Players.LocalPlayer.PlayerGui.ExecutorLevitationSliderGui:Destroy()
 end
 
 -- SERVICES --
 local Players = game:GetService("Players")
-
--- CONFIGURATION --
-local MIN_JUMP_POWER = 50 -- The normal, default jump power
-local MAX_JUMP_POWER = 200 -- The maximum jump power the slider can go to
+local Workspace = game:GetService("Workspace")
 
 -- LOCAL PLAYER --
 local player = Players.LocalPlayer
+local bodyForce = nil
 
 -- CREATE THE GUI --
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ExecutorJumpSliderGui"
+screenGui.Name = "ExecutorLevitationSliderGui"
 screenGui.ResetOnSpawn = false -- Keeps the GUI when you respawn
 
 local mainFrame = Instance.new("Frame")
@@ -34,7 +32,7 @@ titleLabel.Name = "Title"
 titleLabel.Size = UDim2.new(1, 0, 0, 30)
 titleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 titleLabel.BorderSizePixel = 0
-titleLabel.Text = "Jump Power"
+titleLabel.Text = "Levitation Control"
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 18
@@ -61,23 +59,48 @@ sliderThumb.Parent = mainFrame
 -- Parent the GUI to the player's screen
 screenGui.Parent = player.PlayerGui
 
--- SLIDER LOGIC --
-local function updateJumpPower()
+-- LEVITATION LOGIC --
+local function getCharacterMass(character)
+    local mass = 0
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            mass = mass + part:GetMass()
+        end
+    end
+    return mass
+end
+
+local function updateLevitationForce()
     local character = player.Character
-    if not character or not character:FindFirstChild("Humanoid") then return end
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     
-    local humanoid = character.Humanoid
+    local rootPart = character.HumanoidRootPart
+    
+    -- Create the BodyForce if it doesn't exist
+    if not bodyForce or bodyForce.Parent ~= rootPart then
+        if bodyForce then bodyForce:Destroy() end
+        bodyForce = Instance.new("BodyForce")
+        bodyForce.Name = "LevitationForce"
+        bodyForce.Parent = rootPart
+    end
+    
+    -- Calculate the force needed to hover
+    local mass = getCharacterMass(character)
+    local hoverForce = mass * Workspace.Gravity
+    
+    -- Set the max force to be double the hover force for a good range of control
+    local MAX_FORCE = hoverForce * 2
     
     local trackWidth = sliderTrack.AbsoluteSize.X
     local thumbPosition = sliderThumb.Position.X.Offset
     
     local percentage = math.clamp(thumbPosition / trackWidth, 0, 1)
-    local jumpPower = MIN_JUMP_POWER + (MAX_JUMP_POWER - MIN_JUMP_POWER) * percentage
+    local appliedForce = MAX_FORCE * percentage
     
-    titleLabel.Text = "Jump Power: " .. math.floor(jumpPower)
+    titleLabel.Text = "Force: " .. math.floor(appliedForce)
     
-    -- Directly change your humanoid's JumpPower
-    humanoid.JumpPower = jumpPower
+    -- Apply the force on the Y-axis (upward)
+    bodyForce.Force = Vector3.new(0, appliedForce, 0)
 end
 
 -- Handle dragging the slider
@@ -90,10 +113,20 @@ sliderThumb:GetPropertyChangedSignal("Position"):Connect(function()
     local newX = math.clamp(sliderThumb.Position.X.Offset, 0, trackWidth)
     sliderThumb.Position = UDim2.new(0, newX, 0, 45)
     
-    updateJumpPower()
+    updateLevitationForce()
 end)
 
--- Initialize
-updateJumpPower()
+-- Clean up the BodyForce when the GUI is removed
+screenGui.Destroying:Connect(function()
+    if bodyForce then
+        bodyForce:Destroy()
+        bodyForce = nil
+    end
+end)
 
-print("Jump Power Slider loaded.")
+
+-- Initialize
+updateLevitationForce()
+
+print("Levitation Slider loaded.")
+
