@@ -1,5 +1,5 @@
 -- This is a client-side script for use in an executor.
--- It creates a movable GUI to toggle "God Mode" (immortality).
+-- It creates a movable GUI to toggle "God Mode" (immortality) and display health.
 
 -- Make sure the script doesn't error if it's run more than once
 if game.Players.LocalPlayer.PlayerGui:FindFirstChild("ExecutorGodModeGui") then
@@ -24,7 +24,7 @@ screenGui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "GodModeFrame"
-mainFrame.Size = UDim2.new(0, 200, 0, 40)
+mainFrame.Size = UDim2.new(0, 200, 0, 65) -- Increased height
 mainFrame.Position = UDim2.new(0.5, -100, 0, 20)
 mainFrame.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
 mainFrame.BorderSizePixel = 0
@@ -32,13 +32,24 @@ mainFrame.Parent = screenGui
 
 local toggleButton = Instance.new("TextButton")
 toggleButton.Name = "ToggleButton"
-toggleButton.Size = UDim2.new(1, 0, 1, 0)
+toggleButton.Size = UDim2.new(1, 0, 0, 40) -- Adjusted size
 toggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 toggleButton.Text = "God Mode: OFF [G]"
 toggleButton.Font = Enum.Font.SourceSansBold
 toggleButton.TextColor3 = Color3.fromRGB(255, 80, 80)
 toggleButton.TextSize = 18
 toggleButton.Parent = mainFrame
+
+local healthStatus = Instance.new("TextLabel")
+healthStatus.Name = "HealthStatus"
+healthStatus.Size = UDim2.new(1, 0, 0, 25)
+healthStatus.Position = UDim2.new(0, 0, 0, 40) -- Positioned below the button
+healthStatus.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
+healthStatus.Font = Enum.Font.SourceSansSemibold
+healthStatus.TextColor3 = Color3.fromRGB(255, 255, 255)
+healthStatus.TextSize = 16
+healthStatus.Text = "Health: --- / ---"
+healthStatus.Parent = mainFrame
 
 screenGui.Parent = player.PlayerGui
 
@@ -64,26 +75,36 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 -- GOD MODE LOGIC --
+local function updateHealthDisplay()
+    local character = player.Character
+    if character and character:FindFirstChild("Humanoid") then
+        local humanoid = character.Humanoid
+        healthStatus.Text = "Health: " .. math.floor(humanoid.Health) .. " / " .. math.floor(humanoid.MaxHealth)
+    else
+        healthStatus.Text = "Health: --- / ---"
+    end
+end
+
 local function enableGodMode()
     local character = player.Character
     if not character or not character:FindFirstChild("Humanoid") then return end
     local humanoid = character:FindFirstChild("Humanoid")
 
-    -- Disconnect any old connection to prevent duplicates
     if healthConnection then healthConnection:Disconnect() end
 
-    humanoid.Health = humanoid.MaxHealth -- Heal instantly on enable
+    humanoid.Health = humanoid.MaxHealth
     
     healthConnection = humanoid.HealthChanged:Connect(function(newHealth)
-        -- We check > 0 to still allow death from falling out of the map (health set to 0)
         if newHealth < humanoid.MaxHealth and newHealth > 0 then
             humanoid.Health = humanoid.MaxHealth
         end
+        updateHealthDisplay()
     end)
     
     isGodMode = true
     toggleButton.Text = "God Mode: ON [G]"
     toggleButton.TextColor3 = Color3.fromRGB(80, 255, 80)
+    updateHealthDisplay()
 end
 
 local function disableGodMode()
@@ -95,6 +116,7 @@ local function disableGodMode()
     isGodMode = false
     toggleButton.Text = "God Mode: OFF [G]"
     toggleButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+    updateHealthDisplay()
 end
 
 local function toggleGodMode()
@@ -117,9 +139,8 @@ end)
 
 -- HANDLE RESPAWNS --
 player.CharacterAdded:Connect(function(character)
-    -- If god mode was active before dying, re-enable it for the new character.
+    updateHealthDisplay() -- Update display for new character
     if isGodMode then
-        -- A small delay to ensure the Humanoid is fully loaded before we access it
         task.wait(0.1)
         enableGodMode()
     end
@@ -127,6 +148,11 @@ end)
 
 -- CLEANUP --
 screenGui.Destroying:Connect(disableGodMode)
+
+-- Initial setup if character already exists
+if player.Character then
+    updateHealthDisplay()
+end
 
 print("God Mode Script loaded. Press 'G' to toggle.")
 
