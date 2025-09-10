@@ -101,29 +101,37 @@ local function onHealthChanged(newHealth)
         if creatorTag and creatorTag.Value and creatorTag.Value:IsA("Player") then
             lastAttacker = creatorTag.Value.Name
         else
-            -- If no creator tag, check what's touching the character
+            -- If no creator tag, scan for the nearest model when damage is taken
             local foundAttacker = false
-            if character:FindFirstChild("HumanoidRootPart") then
-                local touchingParts = character.HumanoidRootPart:GetTouchingParts()
-                for _, part in ipairs(touchingParts) do
-                    -- Make sure the part is not part of our own character
-                    if part.Parent and not part:IsDescendantOf(character) then
-                        if part.Parent:IsA("Model") and part.Parent.Name ~= "Workspace" then
-                            -- Display as "ModelName (PartName)" for more detail
-                            lastAttacker = part.Parent.Name .. " (" .. part.Name .. ")"
-                        else
-                            -- If the part's parent isn't a model, just show the part's name
-                            lastAttacker = part.Name
+            local myRoot = character:FindFirstChild("HumanoidRootPart")
+
+            if myRoot then
+                local closestModel = nil
+                local minDistance = 50 -- Search radius in studs
+
+                for _, model in ipairs(game.Workspace:GetChildren()) do
+                    if model:IsA("Model") and model ~= character then
+                        -- Find a part to measure distance from. Works for non-humanoid models.
+                        local otherRoot = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildOfClass("BasePart")
+                        
+                        if otherRoot then
+                            local distance = (myRoot.Position - otherRoot.Position).Magnitude
+                            if distance < minDistance then
+                                minDistance = distance
+                                closestModel = model
+                            end
                         end
-                        foundAttacker = true
-                        break -- We found the likely cause, so we can stop looking
                     end
                 end
-                if not foundAttacker then
-                    lastAttacker = "Environmental" -- A better default if nothing is touching
+
+                if closestModel then
+                    lastAttacker = closestModel.Name
+                    foundAttacker = true
                 end
-            else
-                 lastAttacker = "Unknown Source" -- Fallback if no root part exists
+            end
+
+            if not foundAttacker then
+                lastAttacker = "Environmental"
             end
         end
     end
