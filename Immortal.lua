@@ -9,13 +9,14 @@ end
 -- SERVICES --
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 -- LOCAL PLAYER --
 local player = Players.LocalPlayer
 
 -- GOD MODE STATE --
 local isGodMode = false
-local healthConnection = nil
+local godModeConnection = nil
 
 -- CREATE THE GUI --
 local screenGui = Instance.new("ScreenGui")
@@ -90,28 +91,38 @@ local function enableGodMode()
     if not character or not character:FindFirstChild("Humanoid") then return end
     local humanoid = character:FindFirstChild("Humanoid")
 
-    if healthConnection then healthConnection:Disconnect() end
+    -- This prevents one-shot kills from breaking the script
+    humanoid.BreakJointsOnDeath = false
 
-    humanoid.Health = humanoid.MaxHealth
-    
-    healthConnection = humanoid.HealthChanged:Connect(function(newHealth)
-        if newHealth < humanoid.MaxHealth and newHealth > 0 then
-            humanoid.Health = humanoid.MaxHealth
-        end
-        updateHealthDisplay()
+    if godModeConnection then godModeConnection:Disconnect() end
+
+    godModeConnection = RunService.Heartbeat:Connect(function()
+        pcall(function()
+             if humanoid.Health < humanoid.MaxHealth then
+                humanoid.Health = humanoid.MaxHealth
+            end
+            updateHealthDisplay()
+        end)
     end)
     
     isGodMode = true
     toggleButton.Text = "God Mode: ON [G]"
     toggleButton.TextColor3 = Color3.fromRGB(80, 255, 80)
-    updateHealthDisplay()
 end
 
 local function disableGodMode()
-    if healthConnection then
-        healthConnection:Disconnect()
-        healthConnection = nil
+    if godModeConnection then
+        godModeConnection:Disconnect()
+        godModeConnection = nil
     end
+    
+    -- Restore normal death behavior
+    pcall(function()
+        local character = player.Character
+        if character and character:FindFirstChild("Humanoid") then
+            character.Humanoid.BreakJointsOnDeath = true
+        end
+    end)
     
     isGodMode = false
     toggleButton.Text = "God Mode: OFF [G]"
