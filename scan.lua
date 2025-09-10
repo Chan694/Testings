@@ -80,6 +80,7 @@ end)
 
 -- LOGGER LOGIC --
 local function logEvent(message)
+    if not mainFrame or not mainFrame.Parent then return end
     -- Prune old logs if limit is reached
     if #logContainer:GetChildren() > MAX_LOGS then
         logContainer:GetChildren()[1]:Destroy()
@@ -102,57 +103,114 @@ local function logEvent(message)
 end
 
 -- EVENT CONNECTIONS --
-local connections = {}
+local allConnections = {}
+local damageTrackers = {} -- To store last health values and connections for characters
+
+-- Player/NPC Monitoring
+local function setupCharacterMonitoring(char)
+    if not char or damageTrackers[char] then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    local p = Players:GetPlayerFromCharacter(char)
+    local isLocalPlayer = (p == player)
+    
+    damageTrackers[char] = { lastHealth = humanoid.Health, connections = {} }
+
+    -- Monitor Health Changes (Damage Taken / Dealt)
+    local healthConn = humanoid.HealthChanged:Connect(function(newHealth)
+        local lastHealth = damageTrackers[char].lastHealth
+        if newHealth < lastHealth then
+            local damage = math.floor(lastHealth - newHealth)
+            if isLocalPlayer then
+                local attackerName = "Unknown"
+                local nearestDist, nearestModel = math.huge, nil
+                for _, thing in ipairs(Workspace:GetChildren()) do
+                    if thing:IsA("Model") and thing ~= char and thing.PrimaryPart then
+                        local dist = (char.PrimaryPart.Position - thing.PrimaryPart.Position).Magnitude
+                        if dist < nearestDist then
+                            nearestDist, nearestModel = dist, thing
+                        end
+                    end
+                end
+                if nearestModel and nearestDist < 75 then
+                    attackerName = nearestModel.Name
+                end
+                logEvent(string.format("<font color='#FF6347'>Damage Taken:</font> %d from %s", damage, attackerName))
+            else
+                local creatorTag = humanoid:FindFirstChild("creator")
+                if creatorTag and creatorTag.Value == player then
+                     logEvent(string.format("<font color='#40E0D0'>Damage Dealt:</font> %d to %s", damage, char.Name))
+                end
+            end
+        end
+        damageTrackers[char].lastHealth = newHealth
+    end)
+    table.insert(damageTrackers[char].connections, healthConn)
+
+    -- Monitor Death
+    local diedConn = humanoid.Died:Connect(function()
+        local killerTag = humanoid:FindFirstChild("creator")
+        local killerName = (killerTag and killerTag.Value and killerTag.Value.Name) or "Unknown"
+        if p then
+            logEvent(string.format("<font color='#FF4500'>Player Died:</font> %s (Killed by: %s)", p.Name, killerName))
+        else
+            logEvent(string.format("<font color='#FFA07A'>NPC Died:</font> %s (Killed by: %s)", char.Name, killerName))
+        end
+        
+        if damageTrackers[char] then
+            for _, c in ipairs(damageTrackers[char].connections) do c:Disconnect() end
+            damageTrackers[char] = nil
+        end
+    end)
+    table.insert(damageTrackers[char].connections, diedConn)
+end
 
 -- Player Connections
 local function onPlayerAdded(p)
     logEvent(string.format("<font color='#00FF00'>Player Joined:</font> %s (%d)", p.Name, p.UserId))
     
-    connections[#connections + 1] = p.Chatted:Connect(function(msg)
+    table.insert(allConnections, p.Chatted:Connect(function(msg)
         logEvent(string.format("<font color='#ADD8E6'>[CHAT] %s:</font> %s", p.Name, msg))
-    end)
+    end))
     
-    connections[#connections + 1] = p.CharacterAdded:Connect(function(char)
+    table.insert(allConnections, p.CharacterAdded:Connect(function(char)
         logEvent(string.format("<font color='#FFFF00'>Character Spawned:</font> %s", p.Name))
-        local humanoid = char:WaitForChild("Humanoid")
-        connections[#connections + 1] = humanoid.Died:Connect(function()
-            local killerTag = humanoid:FindFirstChild("creator")
-            local killerName = (killerTag and killerTag.Value and killerTag.Value.Name) or "Unknown"
-            logEvent(string.format("<font color='#FF4500'>Character Died:</font> %s (Killed by: %s)", p.Name, killerName))
-        end)
-    end)
+        setupCharacterMonitoring(char)
+    end))
+    
+    if p.Character then
+        setupCharacterMonitoring(p.Character)
+    end
 end
 
-Players.PlayerAdded:Connect(onPlayerAdded)
-connections[#connections + 1] = Players.PlayerRemoving:Connect(function(p)
+table.insert(allConnections, Players.PlayerAdded:Connect(onPlayerAdded))
+table.insert(allConnections, Players.PlayerRemoving:Connect(function(p)
     logEvent(string.format("<font color='#FF0000'>Player Left:</font> %s", p.Name))
-end)
+end))
 
--- Workspace Connections (for NPCs)
-connections[#connections + 1] = Workspace.DescendantAdded:Connect(function(descendant)
+-- Workspace Connections (for NPCs and custom bugs)
+table.insert(allConnections, Workspace.DescendantAdded:Connect(function(descendant)
     if descendant:IsA("Humanoid") and not Players:GetPlayerFromCharacter(descendant.Parent) then
         logEvent(string.format("<font color='#90EE90'>NPC Spawned:</font> %s", descendant.Parent.Name))
-        connections[#connections + 1] = descendant.Died:Connect(function()
-             local killerTag = descendant:FindFirstChild("creator")
-             local killerName = (killerTag and killerTag.Value and killerTag.Value.Name) or "Unknown"
-            logEvent(string.format("<font color='#FFA07A'>NPC Died:</font> %s (Killed by: %s)", descendant.Parent.Name, killerName))
-        end)
+        setupCharacterMonitoring(descendant.Parent)
+    elseif descendant:IsA("Model") and descendant.PrimaryPart and not descendant:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(descendant) and not descendant:IsA("Accessory") and not descendant:IsDescendantOf(Players) and not descendant:IsDescendantOf(Workspace.Terrain) then
+        logEvent(string.format("<font color='#DA70D6'>Model Spawned:</font> %s", descendant.Name))
     end
-end)
+end))
 
-
--- Initial Setup (for existing players)
-for _, p in ipairs(Players:GetPlayers()) do
-    onPlayerAdded(p)
-end
+-- Initial Setup
+for _, p in ipairs(Players:GetPlayers()) do onPlayerAdded(p) end
 logEvent("<font color='#FFFFFF'>Logger initialized. Monitoring game events.</font>")
-
 
 -- CLEANUP --
 screenGui.Destroying:Connect(function()
-    for _, conn in ipairs(connections) do
-        conn:Disconnect()
+    for _, conn in ipairs(allConnections) do conn:Disconnect() end
+    for _, tracker in pairs(damageTrackers) do
+        for _, conn in ipairs(tracker.connections) do conn:Disconnect() end
     end
 end)
 
 print("Game Event Logger loaded.")
+
