@@ -1,6 +1,6 @@
 -- This is a client-side script for use in an executor.
 -- It creates a movable GUI to toggle "God Mode" (immortality) and display health.
--- It now includes a network hook to attempt to block outgoing damage reports.
+-- It now uses a targeted network hook to block incoming damage.
 
 -- Make sure the script doesn't error if it's run more than once
 if game.Players.LocalPlayer.PlayerGui:FindFirstChild("ExecutorGodModeGui") then
@@ -10,15 +10,13 @@ end
 -- SERVICES --
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 -- LOCAL PLAYER --
 local player = Players.LocalPlayer
 
 -- GOD MODE STATE --
 local isGodMode = false
-local godModeConnection = nil
-local originalMaxHealth = nil -- Variable to store original max health
+local healthConnection = nil
 local oldNamecall -- For storing the original network function
 
 -- CREATE THE GUI --
@@ -83,13 +81,7 @@ local function updateHealthDisplay()
     local character = player.Character
     if character and character:FindFirstChild("Humanoid") then
         local humanoid = character.Humanoid
-        local currentHealth = humanoid.Health
-        local maxHealth = humanoid.MaxHealth
-        
-        local healthStr = (currentHealth == math.huge) and "Infinite" or tostring(math.floor(currentHealth))
-        local maxHealthStr = (maxHealth == math.huge) and "Infinite" or tostring(math.floor(maxHealth))
-        
-        healthStatus.Text = "Health: " .. healthStr .. " / " .. maxHealthStr
+        healthStatus.Text = "Health: " .. math.floor(humanoid.Health) .. " / " .. math.floor(humanoid.MaxHealth)
     else
         healthStatus.Text = "Health: --- / ---"
     end
@@ -100,67 +92,43 @@ local function enableGodMode()
     if not character or not character:FindFirstChild("Humanoid") then return end
     local humanoid = character:FindFirstChild("Humanoid")
 
-    if not originalMaxHealth then
-        originalMaxHealth = humanoid.MaxHealth
-    end
-    
-    humanoid.BreakJointsOnDeath = false
-
-    -- Physical God Mode (client-side)
-    if godModeConnection then godModeConnection:Disconnect() end
-    godModeConnection = RunService.Heartbeat:Connect(function()
-        pcall(function()
-            if humanoid.MaxHealth ~= math.huge then humanoid.MaxHealth = math.huge end
-            if humanoid.Health ~= math.huge then humanoid.Health = math.huge end
-            updateHealthDisplay()
-        end)
-    end)
-
-    -- Network God Mode (hook namecall)
-    -- This requires an executor that supports hookmetamethod or a similar function.
+    -- Hook the __namecall metamethod to intercept function calls.
+    -- This requires an executor that supports this functionality.
     if not oldNamecall and typeof(hookmetamethod) == "function" then
         oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-            local method = getnamecallmethod()
-            -- We are looking for a remote event being fired from inside the character model
-            -- This is a guess that damage events are fired from scripts inside the character
-            if typeof(self) == "Instance" and self:IsA("RemoteEvent") and method == "FireServer" and self:IsDescendantOf(character) then
-                -- Block the call by returning nothing
-                return
+            -- Check if the object being called is our humanoid
+            if self == humanoid then
+                -- Check if the function being called is "TakeDamage"
+                if getnamecallmethod():lower() == "takedamage" then
+                    -- Block the damage by returning nothing and not calling the original function
+                    return
+                end
             end
+            -- If it's not a blocked call, proceed as normal
             return oldNamecall(self, ...)
         end)
     end
-    
+
+    if healthConnection then healthConnection:Disconnect() end
+    healthConnection = humanoid.HealthChanged:Connect(updateHealthDisplay)
+
     isGodMode = true
     toggleButton.Text = "God Mode: ON [G]"
     toggleButton.TextColor3 = Color3.fromRGB(80, 255, 80)
+    updateHealthDisplay()
 end
 
 local function disableGodMode()
-    if godModeConnection then
-        godModeConnection:Disconnect()
-        godModeConnection = nil
-    end
-
-    -- Restore network function if it was hooked
+    -- Restore the original network function if it was hooked
     if oldNamecall and typeof(hookmetamethod) == "function" then
         hookmetamethod(game, "__namecall", oldNamecall)
         oldNamecall = nil
     end
-    
-    pcall(function()
-        local character = player.Character
-        if character and character:FindFirstChild("Humanoid") then
-            local humanoid = character.Humanoid
-            humanoid.BreakJointsOnDeath = true
-            if originalMaxHealth then
-                humanoid.MaxHealth = originalMaxHealth
-                humanoid.Health = originalMaxHealth
-            end
-        end
-    end)
-    
-    originalMaxHealth = nil
+
+    if healthConnection then
+        healthConnection:Disconnect()
+        healthConnection = nil
+    end
     
     isGodMode = false
     toggleButton.Text = "God Mode: OFF [G]"
@@ -191,7 +159,6 @@ player.CharacterAdded:Connect(function(character)
     updateHealthDisplay()
     if isGodMode then
         task.wait(0.1)
-        originalMaxHealth = nil -- Reset for the new character
         enableGodMode()
     end
 end)
