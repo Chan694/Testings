@@ -106,15 +106,24 @@ local function onHealthChanged(newHealth)
             if character:FindFirstChild("HumanoidRootPart") then
                 local touchingParts = character.HumanoidRootPart:GetTouchingParts()
                 for _, part in ipairs(touchingParts) do
-                    if part.Parent and part.Parent:FindFirstChildOfClass("Humanoid") and part.Parent ~= character then
-                        lastAttacker = part.Parent.Name
+                    -- Make sure the part is not part of our own character
+                    if part.Parent and not part:IsDescendantOf(character) then
+                        if part.Parent:IsA("Model") and part.Parent.Name ~= "Workspace" then
+                            -- Display as "ModelName (PartName)" for more detail
+                            lastAttacker = part.Parent.Name .. " (" .. part.Name .. ")"
+                        else
+                            -- If the part's parent isn't a model, just show the part's name
+                            lastAttacker = part.Name
+                        end
                         foundAttacker = true
-                        break -- Found a likely attacker
+                        break -- We found the likely cause, so we can stop looking
                     end
                 end
                 if not foundAttacker then
-                    lastAttacker = "Unknown"
+                    lastAttacker = "Environmental" -- A better default if nothing is touching
                 end
+            else
+                 lastAttacker = "Unknown Source" -- Fallback if no root part exists
             end
         end
     end
