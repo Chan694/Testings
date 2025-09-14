@@ -19,7 +19,15 @@ local ENEMY_NAME_KEYWORDS = {
     "Sand Scorpion", "Sand Beetle", "Rolling Toxic Spider", "Mutant Rat", "Roach", "Queen Spider",
     "King Wasp", "Rat", "Mutant Roach", "Toxic Stinger", "Mouse", "Moth", "Mosquito", "Mole",
     "Locust", "Lobster", "Ladybug", "King Octopus", "Chicken Zombie", "Goblin Rider", "Hydraviper",
-    "House Fly", "Dragonfly", "Crab", "Cobra", "Chameleon", "Bed Bug", "Earwig", "Ant"
+    "House Fly", "Dragonfly", "Crab", "Cobra", "Chameleon", "Bed Bug", "Earwig", "Ant" "enemy_ant","enemy_aphid",
+    "enemy_baby_octopus","enemy_beetle","enemy_behavior","enemy_bg_beetle","enemy_bg_caterpillar",
+    "enemy_bg_pincher","enemy_bullet_ant","enemy_caterpillar","enemy_chameleon","enemy_cobra","enemy_crab","enemy_dragonfly",
+    "enemy_house_fly","enemy_hydraviper_boss","enemy_jockey_summer","enemy_king_octopus","enemy_ladybug","enemy_lobster","enemy_locust",
+    "enemy_mole","enemy_mosquito","enemy_moth","enemy_mouse","enemy_mutant_ant","enemy_mutant_fly","enemy_queen_bee",
+    "enemy_queen_spider","enemy_rat","enemy_roach","enemy_rodent_boss","enemy_rollie_pollie","enemy_sand_beetle","enemy_sand_scorpion",
+    "enemy_sand_spider","enemy_sand_worm","enemy_scorpion_king","enemy_scorpion","enemy_shell_crab","enemy_slug","enemy_snail_king",
+    "enemy_snail","enemy_spineserpent","enemy_toxic_ant","enemy_toxic_fly","enemy_toxic_mantis","enemy_toxic_slug","enemy_toxic_spider",
+    "enemy_toxitail","enemy_worm","enemy_jockey"
 }
 
 -- GUI Setup
