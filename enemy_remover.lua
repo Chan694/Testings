@@ -19,7 +19,7 @@ local ENEMY_NAME_KEYWORDS = {
     "Sand Scorpion", "Sand Beetle", "Rolling Toxic Spider", "Mutant Rat", "Roach", "Queen Spider",
     "King Wasp", "Rat", "Mutant Roach", "Toxic Stinger", "Mouse", "Moth", "Mosquito", "Mole",
     "Locust", "Lobster", "Ladybug", "King Octopus", "Chicken Zombie", "Goblin Rider", "Hydraviper",
-    "House Fly", "Dragonfly", "Crab", "Cobra", "Chameleon", "Bed Bug", "Earwig", "Ant" "enemy_ant","enemy_aphid",
+    "House Fly", "Dragonfly", "Crab", "Cobra", "Chameleon", "Bed Bug", "Earwig", "Ant", "enemy_ant","enemy_aphid",
     "enemy_baby_octopus","enemy_beetle","enemy_behavior","enemy_bg_beetle","enemy_bg_caterpillar",
     "enemy_bg_pincher","enemy_bullet_ant","enemy_caterpillar","enemy_chameleon","enemy_cobra","enemy_crab","enemy_dragonfly",
     "enemy_house_fly","enemy_hydraviper_boss","enemy_jockey_summer","enemy_king_octopus","enemy_ladybug","enemy_lobster","enemy_locust",
@@ -164,6 +164,6 @@ task.spawn(function()
         eraserActive = false
         statusLabel.Text = "Eraser Status: OFF"
         statusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-        task.wait(200)
+        task.wait(100)
     end
 end)
